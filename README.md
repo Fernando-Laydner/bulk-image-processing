@@ -4,7 +4,7 @@ Simples to use bulk image processing made in python by user: @Fernando-Laydner
 
 How to use:
 *******************************************************************************************************
-You will need to at least create a folder called 'Ready Images' for the program to work out of the box.
+The program should work out of the box if you have the module Pillow installed already: pip install Pillow
 *******************************************************************************************************
 I recommend using the whole program in a same folder, and moving the pictures inside the folder for processing. 
 There is a settings part on the top of the .main.py file. In there u may change the input (origins) and the output (destiny) folders as well as the desired extension for the output and a few other saving options requested by  the module Pillow.
