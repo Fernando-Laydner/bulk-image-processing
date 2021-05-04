@@ -12,6 +12,7 @@ image_quality = 90
 extention = 'jpg'
 keep_original = True
 destinys = address + '\\Ready Images\\'
+os.makedirs(destinys, exist_ok=True)
 origins = address + '\\'
 
 # Search directory for image files
