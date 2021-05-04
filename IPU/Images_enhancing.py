@@ -2,12 +2,6 @@ from PIL import Image
 from shutil import copyfile
 import os
 
-#######################################################################################
-
-
-#######################################################################################
-
-
 # Convert and tries to enhance the image.
 def enhance(origin, destiny, formating, optimal, image_quality):
     # Verify if Image can be openned by PIL. If not, returns 0.
