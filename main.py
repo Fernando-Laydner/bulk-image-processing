@@ -2,15 +2,19 @@ import os
 from IPU import Images_enhancing as Img
 
 # Idea: A more user-end .exe file with tkinter (Logs, Options), cmd launch option for batch and automated uses.
+# Loss mode: enables for continious compression until file size is at or below desired or mininal image_quality
+# is reached.
+
 
 # Get file location.
 address = os.path.abspath(os.getcwd())
 
 # Global variables for easier customizability.
 optimal = True
-image_quality = 90
+image_quality = 85
 extention = 'jpg'
-keep_original = True
+keep_original = False
+mode = 'RGB'
 destinys = address + '\\Ready Images\\'
 os.makedirs(destinys, exist_ok=True)
 origins = address + '\\'
@@ -32,7 +36,7 @@ for file_in_address in os.listdir(address):
 
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
-        if Img.enhance(origin, destiny, extention, optimal, image_quality) != 0 and not keep_original:
-            os.remove(origin)
+        Img.enhance(origin, destiny, extention, optimal, image_quality, keep_original, mode)
+        Img.beautifying(destiny, 500, 500)
     except:
         print(origin + "\tError")
