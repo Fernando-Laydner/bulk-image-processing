@@ -13,30 +13,33 @@ address = os.path.abspath(os.getcwd())
 optimal = True
 image_quality = 85
 extention = 'jpg'
-keep_original = False
+keep_original = True
+keep_exif = True
+crop_and_resizing = True
 mode = 'RGB'
-destinys = address + '\\Ready Images\\'
-os.makedirs(destinys, exist_ok=True)
-origins = address + '\\'
+destiny_base = address + '\\Ready Images\\'
+os.makedirs(destiny_base, exist_ok=True)
+origin_base = address + '\\'
 
 # Search directory for image files
 for file_in_address in os.listdir(address):
-    if file_in_address.find('.py') != -1 or file_in_address.find('.') == -1:
+    if file_in_address.find('.py') != -1 or file_in_address.find('.') == -1 or file_in_address.find('.idea') != -1:
         continue
 
     # Adjust path to file.
-    origin = origins + file_in_address
-    destiny = destinys + file_in_address
+    origin = origin_base + file_in_address
+    destiny = destiny_base + file_in_address
 
     # Set destiny of the file with proper format.
-    destiny = Img.correct(destiny, extention)
+    destiny = Img.correct(destiny, extention).lower()
 
     # Set entire file location to lowercase, to avoid having to deal with uppercase letters in the extension.
     origin = origin.lower()
 
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
-        Img.enhance(origin, destiny, extention, optimal, image_quality, keep_original, mode)
-        Img.beautifying(destiny, 500, 500)
-    except:
+        Img.enhance(origin, destiny, extention, optimal, image_quality, keep_original, mode, keep_exif)
+        if crop_and_resizing:
+            Img.crop_and_resize(destiny, 1000, 1000, 0.2)
+    except IOError or Exception:
         print(origin + "\tError")
