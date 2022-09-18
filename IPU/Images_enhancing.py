@@ -52,7 +52,7 @@ def enhance(origin, destiny, formating, optimal, image_quality, keep_original, m
 
     # Get original file's extention for reporting and checking if enhancing was worth it.
     if origin.split('.')[-1] != destiny.split('.')[-1]:
-        print(origin, "\tConverted from " + extention + " to " + formating + " and enhanced!")
+        print(origin, "\tConverted from " + origin.split('.')[-1] + " to " + destiny.split('.')[-1] + " and enhanced!")
     else:
         if os.stat(origin).st_size < os.stat(destiny).st_size:
             os.remove(destiny)
@@ -145,7 +145,7 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
         # Make image sharper if it was too small
         sharpen = False
         if sharpen:
-            if height_cropped < height_min/2 or width_cropped < width_min/2:
+            if height_actual < height_min/2 or width_actual < width_min/2:
                 sharp = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
                 cropped_image = cv2.filter2D(cropped_image, -1, sharp)
 
@@ -160,7 +160,7 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
         img = (255 - img)
 
         # Get the cropped image into the blank image
-        img[border:height_cropped + border, border:width_cropped + border] = cropped_image
+        img[border:height_actual + border, border:width_actual + border] = cropped_image
 
         # Message
         print(destiny + " Image was cropped successfully")
