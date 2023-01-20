@@ -13,7 +13,7 @@ address = os.path.abspath(os.getcwd())
 optimal = True
 image_quality = 85
 extention = 'jpg'
-keep_original = True
+keep_original = False
 keep_exif = True
 crop_and_resizing = True
 mode = 'RGB'
@@ -38,6 +38,7 @@ for file_in_address in os.listdir(address):
 
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
+        # Img.denoiser(origin)
         Img.enhance(origin, destiny, extention, optimal, image_quality, keep_original, mode, keep_exif)
         if crop_and_resizing:
             Img.crop_and_resize(destiny, 1000, 1000, 0.2)
