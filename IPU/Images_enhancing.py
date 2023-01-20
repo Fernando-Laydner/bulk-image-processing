@@ -95,13 +95,14 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
     img = cv_open_image(destiny)
 
     # Convert the into gray scale
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Get the height and width of the image.
-    h, w = img.shape[:2]
+    h, w = img_grey.shape[:2]
 
     # Invert the image to be white on black for compatibility with findContours function.
-    imgray = 255 - img
+    imgray = 255 - img_grey
 
     # Binarize the image and call it thresh.
     ret, thresh = cv2.threshold(imgray, 10, 255, cv2.THRESH_BINARY)
@@ -134,7 +135,7 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
     # Check if image needs to be cropped
     if top_x > 10 and top_y > 10 and w - bottom_x > 10 and h - bottom_y > 10:
         # Crop image
-        cropped_image = img[top_y:bottom_y, top_x:bottom_x]
+        cropped_image = np.array(img)[top_y:bottom_y, top_x:bottom_x]
 
         # Adds the border to the image size
         top_y -= border
@@ -143,20 +144,14 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
         bottom_x += border
 
         # Make image sharper if it was too small
-        sharpen = False
-        if sharpen:
+        denoise = False
+        if denoise:
             if height_actual < height_min/2 or width_actual < width_min/2:
-                sharp = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
-                cropped_image = cv2.filter2D(cropped_image, -1, sharp)
-
-                cropped_image = cv2.bilateralFilter(cropped_image, 6, 21, 7)
-                cropped_image = cv2.GaussianBlur(cropped_image, (5, 5), 1)
-
-                print(destiny + " Tried to sharpen and blur image because it was too small, "
-                                "check if it is properly done")
+                denoiser(img)
+                print(destiny + " Tried to denoise image because it was too small before resize")
 
         # Creates blank image
-        img = np.zeros((bottom_y - top_y, bottom_x - top_x), np.uint8)
+        img = np.zeros((bottom_y - top_y, bottom_x - top_x, 3), np.uint8)
         img = (255 - img)
 
         # Get the cropped image into the blank image
@@ -214,6 +209,17 @@ def background_off(src, background_threshold_start=250, background_threshold_fin
     cv_save_image(src, result)
 
 
+# Denoises the image
+def denoiser(img):
+    if isinstance(img, str):
+        img2 = cv_open_image(img)
+        img2 = cv2.medianBlur(img2, 5)
+        cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
+        cv_save_image(img, img2)
+    else:
+        return cv2.medianBlur(img, 5)
+
+
 # Set proper extention to the end result.
 def correct(string, extention):
     return string.rpartition('.')[0] + '.' + extention
@@ -222,6 +228,7 @@ def correct(string, extention):
 # Open image to CV because it doesnt like to work
 def cv_open_image(path):
     process = Image.open(path)
+    process.load()
     img = np.array(process, np.uint8)
     return img[:, :, ::-1].copy()
 
