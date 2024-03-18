@@ -41,6 +41,6 @@ for file_in_address in os.listdir(address):
         # Img.denoiser(origin)
         Img.enhance(origin, destiny, extention, optimal, image_quality, keep_original, mode, keep_exif)
         if crop_and_resizing:
-            Img.crop_and_resize(destiny, 1000, 1000, 0.2)
+            Img.crop_and_resize(destiny, 1000, 1000, 0.2, True)
     except IOError or Exception:
         print(origin + "\tError")
