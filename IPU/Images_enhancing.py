@@ -90,7 +90,7 @@ def image_resize(image, width=None, height=None, inter=cv2.INTER_AREA):
 
 
 # Crop and resizes image
-def crop_and_resize(destiny, width_min, height_min, border_ratio):
+def crop_and_resize(destiny, width_min, height_min, border_ratio, black_dots=False):
     # Opens the file
     img = cv_open_image(destiny)
 
@@ -169,6 +169,12 @@ def crop_and_resize(destiny, width_min, height_min, border_ratio):
         img = image_resize(img, min_size)
         print(destiny + " Image was resized to: " + str(min_size))
 
+    # Add black dots if specified
+    if black_dots:
+        # Adds a black dot on the first and last pixel of the image
+        img[0, 0] = [0, 0, 0]
+        img[img.shape[0] - 1, img.shape[1] - 1] = [0, 0, 0]
+
     # Save it
     cv_save_image(destiny, img)
 
@@ -225,7 +231,7 @@ def correct(string, extention):
     return string.rpartition('.')[0] + '.' + extention
 
 
-# Open image to CV because it doesnt like to work
+# Open image to CV because it doesn't like to work
 def cv_open_image(path):
     process = Image.open(path)
     process.load()
@@ -233,7 +239,7 @@ def cv_open_image(path):
     return img[:, :, ::-1].copy()
 
 
-# Save image to CV because it doesnt like to work
+# Save image to CV because it doesn't like to work
 def cv_save_image(path, img):
     im_pil = Image.fromarray(img)
     im_pil.save(path)
