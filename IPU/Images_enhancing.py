@@ -1,248 +1,17 @@
-from PIL import Image, ImageFilter
-import cv2
-from shutil import copyfile
 import os
+import cv2
 import numpy as np
+from shutil import copyfile
+from PIL import Image, ImageFilter
+from rembg import remove, new_session
 
 # Known extensions not supported: exr, pfm, sfw, x3f, fts, hdr, mng, pam, picon, pict, wpg, xcf, xpm, xwd, svg, wbmp,
 # cr2, erf, heic, nrw, orf, pef, pes, ref, rw2
 
 
-# Convert and tries to enhance the image.
-def enhance(origin, destiny, formating, optimal, image_quality, keep_original, mode='', keep_exif=False):
-    # Opens the image.
-    process = Image.open(origin)
-
-    # Check if image metadata is needed.
-    if keep_exif:
-        process.load()
-        exif = process.getexif()
-    else:
-        exif = None
-
-    # Check if mode that was passed exists
-    if mode not in ['RGB', 'RGBA', 'L', 'P', '1', 'LAB', 'CMYK', 'LA', 'YCbCr', 'I', '']:
-        raise Exception("Sorry, mode did not exist")
-
-    # Check image mode in case it needs a change.
-    best_mode = check_mode(process.mode, formating)
-    couldbe_mode = check_mode(mode, formating)
-    if couldbe_mode != 0:
-        if couldbe_mode != best_mode:
-            best_mode = couldbe_mode
-
-    # Probably more changes will be necessary here.
-    if process.mode != best_mode:
-        if process.mode == 'P':
-            process = process.convert("RGBA")
-
-        if best_mode != 'RGBA' and process.mode == 'RGBA':
-            new_image = Image.new("RGBA", process.size, "WHITE")
-            new_image.paste(process, (0, 0), process)
-            process = new_image
-
-        process = process.convert(best_mode)
-
-    # Save image.
-    if keep_exif:
-        process.save(destiny, optimize=optimal, quality=image_quality, exif=exif)
-    else:
-        process.save(destiny, optimize=optimal, quality=image_quality)
-    process.close()
-
-    # Get original file's extention for reporting and checking if enhancing was worth it.
-    if origin.split('.')[-1] != destiny.split('.')[-1]:
-        print(origin, "\tConverted from " + origin.split('.')[-1] + " to " + destiny.split('.')[-1] + " and enhanced!")
-    else:
-        if os.stat(origin).st_size < os.stat(destiny).st_size:
-            os.remove(destiny)
-            copyfile(origin, destiny)
-            print(origin, "\tOriginal file had better compression settings!")
-        else:
-            print(origin, "\tWas enhanced!")
-
-    # Deletes original image
-    if not keep_original:
-        os.remove(origin)
-
-
-def image_resize(image, width=None, height=None, inter=cv2.INTER_AREA):
-    # If both the width and height are None, then return the original image
-    if width is None and height is None:
-        return image
-
-    # Initialize the dimensions of the image to be resized and grab the image size
-    h, w = image.shape[:2]
-
-    # Calculate the ratio of the width and construct the dimensions
-    if width is None:
-        r = height / float(h)
-        dim = (int(w * r), height)
-    else:
-        r = width / float(w)
-        dim = (width, int(h * r))
-
-    # Resize the image
-    resized = cv2.resize(image, dim, interpolation=inter)
-
-    # Return the resized image
-    return resized
-
-
-# Crop and resizes image
-def crop_and_resize(destiny, width_min, height_min, border_ratio, black_dots=False):
-    # Opens the file
-    img = cv_open_image(destiny)
-
-    # Convert the into gray scale
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    img_grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Get the height and width of the image.
-    h, w = img_grey.shape[:2]
-
-    # Invert the image to be white on black for compatibility with findContours function.
-    imgray = 255 - img_grey
-
-    # Binarize the image and call it thresh.
-    ret, thresh = cv2.threshold(imgray, 10, 255, cv2.THRESH_BINARY)
-
-    # Find all the contours in thresh. In your case the 3 and the additional strike
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Calculate bounding rectangles for each contour.
-    rects = [cv2.boundingRect(cnt) for cnt in contours]
-
-    # Calculate the combined bounding rectangle points.
-    top_x = min([x for (x, y, w, h) in rects])
-    top_y = min([y for (x, y, w, h) in rects])
-    bottom_x = max([x + w for (x, y, w, h) in rects])
-    bottom_y = max([y + h for (x, y, w, h) in rects])
-
-    # Get image actual proportions
-    height_actual, width_actual = bottom_y - top_y, bottom_x - top_x
-
-    # Defines what the border could be
-    height_border = int(height_actual * border_ratio)
-    width_border = int(width_actual * border_ratio)
-
-    # Defines what the border will be
-    if height_border > width_border:
-        border = height_border
-    else:
-        border = width_border
-
-    # Check if image needs to be cropped
-    if top_x > 10 and top_y > 10 and w - bottom_x > 10 and h - bottom_y > 10:
-        # Crop image
-        cropped_image = np.array(img)[top_y:bottom_y, top_x:bottom_x]
-
-        # Adds the border to the image size
-        top_y -= border
-        bottom_y += border
-        top_x -= border
-        bottom_x += border
-
-        # Make image sharper if it was too small
-        denoise = False
-        if denoise:
-            if height_actual < height_min/2 or width_actual < width_min/2:
-                denoiser(img)
-                print(destiny + " Tried to denoise image because it was too small before resize")
-
-        # Creates blank image
-        img = np.zeros((bottom_y - top_y, bottom_x - top_x, 3), np.uint8)
-        img = (255 - img)
-
-        # Get the cropped image into the blank image
-        img[border:height_actual + border, border:width_actual + border] = cropped_image
-
-        # Message
-        print(destiny + " Image was cropped successfully")
-
-    # Check if the image needs to resized
-    if height_actual < height_min or width_actual < width_min:
-        if height_min > width_min:
-            min_size = height_min + 2*border
-        else:
-            min_size = width_min + 2 * border
-        img = image_resize(img, min_size)
-        print(destiny + " Image was resized to: " + str(min_size))
-
-    # Add black dots if specified
-    if black_dots:
-        # Adds a black dot on the first and last pixel of the image
-        img[0, 0] = [0, 0, 0]
-        img[img.shape[0] - 1, img.shape[1] - 1] = [0, 0, 0]
-
-    # Save it
-    cv_save_image(destiny, img)
-
-
-# Removes pixels inside the trashhold of a gray scale
-def background_off(src, background_threshold_start=250, background_threshold_finish=255):
-    # load image
-    img = cv_open_image(src)
-
-    # convert to graky
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # threshold input image as mask
-    mask = cv2.threshold(gray, background_threshold_start, background_threshold_finish, cv2.THRESH_BINARY)[1]
-
-    # negate mask
-    mask = 255 - mask
-
-    # apply morphology to remove isolated extraneous noise
-    # use borderconstant of black since foreground touches the edges
-    kernel = np.ones((3, 3), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
-    # anti-alias the mask -- blur then stretch
-    # blur alpha channel
-    mask = cv2.GaussianBlur(mask, (0, 0), sigmaX=2, sigmaY=2, borderType=cv2.BORDER_DEFAULT)
-
-    # linear stretch so that 127.5 goes to 0, but 255 stays 255
-    mask = (2 * (mask.astype(np.float32)) - 255.0).clip(0, 255).astype(np.uint8)
-
-    # put mask into alpha channel
-    result = img.copy()
-    result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
-    result[:, :, 3] = mask
-
-    # save resulting masked image
-    cv_save_image(src, result)
-
-
-# Denoises the image
-def denoiser(img):
-    if isinstance(img, str):
-        img2 = cv_open_image(img)
-        img2 = cv2.medianBlur(img2, 5)
-        cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
-        cv_save_image(img, img2)
-    else:
-        return cv2.medianBlur(img, 5)
-
-
 # Set proper extention to the end result.
 def correct(string, extention):
     return string.rpartition('.')[0] + '.' + extention
-
-
-# Open image to CV because it doesn't like to work
-def cv_open_image(path):
-    process = Image.open(path)
-    process.load()
-    img = np.array(process, np.uint8)
-    return img[:, :, ::-1].copy()
-
-
-# Save image to CV because it doesn't like to work
-def cv_save_image(path, img):
-    im_pil = Image.fromarray(img)
-    im_pil.save(path)
 
 
 # Check image mode to see if conversion is needed.
@@ -293,3 +62,176 @@ def check_mode(mode, formating):
     elif formating in I:
         return 'I'
     return 0
+
+
+class ImageProcessor:
+    image = None
+    np_image = None
+    gray = None
+    original_image = None
+    height, width = None, None
+    true_height, true_width = None, None
+    image_path = None
+    destiny = None
+    debug = False
+
+    def __init__(self, image_path, destiny):
+        self.image_path = image_path
+        self.destiny = destiny
+        self.open_image()
+        if self.np_image is None:
+            raise ValueError("Image not found or unable to open")
+
+        self.original_image = self.np_image.copy()
+        self.height, self.width = self.np_image.shape[:2]
+
+    # Open image to CV because it doesn't like to work
+    def open_image(self):
+        self.image = Image.open(self.image_path)
+        self.update_np_image()
+
+    def update_np_image(self):
+        self.image.load()
+        self.np_image = np.array(self.image, np.uint8).copy()
+
+    def print_and_debug(self):
+        if self.debug:
+            from matplotlib import pyplot as plt
+            plt.imshow(self.np_image, interpolation='nearest')
+            plt.show()
+
+    def enhance(self, formating, mode=''):
+        # Check if mode that was passed exists
+        if mode not in ['RGB', 'RGBA', 'L', 'P', '1', 'LAB', 'CMYK', 'LA', 'YCbCr', 'I', '']:
+            raise Exception("Sorry, mode did not exist")
+
+        # Check image mode in case it needs a change.
+        best_mode = check_mode(self.image.mode, formating)
+        couldbe_mode = check_mode(mode, formating)
+        if couldbe_mode != 0:
+            if couldbe_mode != best_mode:
+                best_mode = couldbe_mode
+
+        # Probably more changes will be necessary here.
+        if self.image.mode != best_mode:
+            if self.image.mode == 'P':
+                self.image = self.image.convert("RGBA")
+
+            if best_mode != 'RGBA' and self.image.mode == 'RGBA':
+                new_image = Image.new("RGBA", self.image.size, "WHITE")
+                new_image.paste(self.image, (0, 0), self.image)
+                self.image = new_image
+
+            self.image = self.image.convert(best_mode)
+            self.update_np_image()
+
+    def image_resize_exact(self, width, height, inter=cv2.INTER_AREA):
+        aspect_ratio = self.true_width / self.true_height
+        if width / height > aspect_ratio:
+            new_width = int(height * aspect_ratio)
+            new_height = height
+        else:
+            new_width = width
+            new_height = int(width / aspect_ratio)
+        self.np_image = cv2.resize(self.np_image, (new_width, new_height), interpolation=inter)
+        self.height, self.width = self.np_image.shape[:2]
+
+    def pad_image(self, border_ratio):
+        self.np_image = cv2.copyMakeBorder(self.np_image, border_ratio, border_ratio, border_ratio, border_ratio,
+                                           cv2.BORDER_CONSTANT, value=[255, 255, 255])
+        self.height, self.width = self.np_image.shape[:2]
+
+    def centralize_image(self, width, height):
+        if self.gray is None:
+            self.gray = cv2.cvtColor(self.np_image, cv2.COLOR_BGR2GRAY)
+        rows = np.any(self.gray < 255, axis=1)
+        cols = np.any(self.gray < 255, axis=0)
+
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+
+        # Crop the image to these bounds
+        self.np_image = self.np_image[y_min:y_max + 1, x_min:x_max + 1]
+        self.true_height, self.true_width = self.np_image.shape[:2]
+
+        # Rotate if necessary
+        if self.true_height < self.true_width / 2:
+            self.rotate_image(45)
+            self.print_and_debug()
+
+        # Resize if necessary
+        h, w, _ = self.np_image.shape
+        if w > width or h > height:
+            self.image_resize_exact(width, height)
+            self.print_and_debug()
+
+        # Create a centered image
+        h, w, _ = self.np_image.shape
+        centered_image = np.zeros((height, width, 3), np.uint8)
+        centered_image.fill(255)
+
+        top_left_y = (height - h) // 2
+        top_left_x = (width - w) // 2
+        centered_image[top_left_y:top_left_y + h, top_left_x:top_left_x + w] = self.np_image
+        self.np_image = centered_image
+        self.height, self.width = self.np_image.shape[:2]
+        self.print_and_debug()
+
+    def rotate_image(self, angle):
+        height, width = self.np_image.shape[:2]
+        center = (width // 2, height // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        cos = np.abs(M[0, 0])
+        sin = np.abs(M[0, 1])
+        new_width = int((height * sin) + (width * cos))
+        new_height = int((height * cos) + (width * sin))
+        M[0, 2] += (new_width / 2) - center[0]
+        M[1, 2] += (new_height / 2) - center[1]
+        self.np_image = cv2.warpAffine(self.np_image, M, (new_width, new_height), borderMode=cv2.BORDER_CONSTANT,
+                                       borderValue=(255, 255, 255))
+        self.height, self.width = self.np_image.shape[:2]
+        self.true_height, self.true_width = self.np_image.shape[:2]
+
+    def remove_background(self):
+        modelos = ["birefnet-general-lite", "silueta"]  # A lot faster the second option, but not as good...
+        my_session = new_session(modelos[0])
+        self.image = remove(self.image, session=my_session)
+        self.update_np_image()
+
+    def save_image(self, optimal, image_quality, keep_original=True, keep_exif=False, choose_smaller=True):
+        self.image = Image.fromarray(self.np_image)
+
+        # Save image.
+        if keep_exif:
+            self.image.save(self.destiny, optimize=optimal, quality=image_quality, exif=self.image.getexif())
+        else:
+            self.image.save(self.destiny, optimize=optimal, quality=image_quality)
+        self.image.close()
+
+        # Get original file's extention for reporting and checking if enhancing was worth it.
+        if self.image_path.split('.')[-1] != self.destiny.split('.')[-1]:
+            print(self.image_path, "\tConverted from " +
+                  self.image_path.split('.')[-1] + " to " + self.destiny.split('.')[-1] + " and enhanced!")
+        else:
+            if choose_smaller and os.stat(self.image_path).st_size < os.stat(self.destiny).st_size:
+                os.remove(self.destiny)
+                copyfile(self.image_path, self.destiny)
+                print(self.image_path, "\tOriginal file had better compression settings!")
+            else:
+                print(self.image_path, "\tWas enhanced!")
+
+        if not keep_original:
+            self.delete_original()
+
+    def delete_original(self):
+        os.remove(self.image_path)
+
+    def process_image(self, width, height, border_ratio, black_dots=False):
+        self.remove_background()
+        self.enhance("jpg", "RGB")
+        self.centralize_image(width, height)
+        self.pad_image(border_ratio)
+
+        if black_dots:
+            self.np_image[0, 0] = [0, 0, 0]
+            self.np_image[self.height - 1, self.width - 1] = [0, 0, 0]
