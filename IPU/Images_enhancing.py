@@ -79,6 +79,7 @@ class ImageProcessor:
         self.image_path = image_path
         self.destiny = destiny
         self.open_image()
+        self.exif = self.image.getexif()
         if self.np_image is None:
             raise ValueError("Image not found or unable to open")
 
@@ -94,13 +95,14 @@ class ImageProcessor:
         self.image.load()
         self.np_image = np.array(self.image, np.uint8).copy()
 
-    def print_and_debug(self):
+    def print_and_debug(self, where):
         if self.debug:
             from matplotlib import pyplot as plt
             plt.imshow(self.np_image, interpolation='nearest')
+            plt.title(where)
             plt.show()
 
-    def enhance(self, formating, mode=''):
+    def formatting(self, formating, mode=''):
         # Check if mode that was passed exists
         if mode not in ['RGB', 'RGBA', 'L', 'P', '1', 'LAB', 'CMYK', 'LA', 'YCbCr', 'I', '']:
             raise Exception("Sorry, mode did not exist")
@@ -140,6 +142,7 @@ class ImageProcessor:
         self.np_image = cv2.copyMakeBorder(self.np_image, border_ratio, border_ratio, border_ratio, border_ratio,
                                            cv2.BORDER_CONSTANT, value=[255, 255, 255])
         self.height, self.width = self.np_image.shape[:2]
+        self.print_and_debug("Padding added")
 
     def centralize_image(self, width, height):
         if self.gray is None:
@@ -157,13 +160,13 @@ class ImageProcessor:
         # Rotate if necessary
         if self.true_height < self.true_width / 2:
             self.rotate_image(45)
-            self.print_and_debug()
+            self.print_and_debug("Rotated")
 
         # Resize if necessary
         h, w, _ = self.np_image.shape
-        if w > width or h > height:
+        if w != width or h != height:
             self.image_resize_exact(width, height)
-            self.print_and_debug()
+            self.print_and_debug("Resized")
 
         # Create a centered image
         h, w, _ = self.np_image.shape
@@ -175,7 +178,7 @@ class ImageProcessor:
         centered_image[top_left_y:top_left_y + h, top_left_x:top_left_x + w] = self.np_image
         self.np_image = centered_image
         self.height, self.width = self.np_image.shape[:2]
-        self.print_and_debug()
+        self.print_and_debug("Centered")
 
     def rotate_image(self, angle):
         height, width = self.np_image.shape[:2]
@@ -195,15 +198,17 @@ class ImageProcessor:
     def remove_background(self):
         modelos = ["birefnet-general-lite", "silueta"]  # A lot faster the second option, but not as good...
         my_session = new_session(modelos[0])
+        print("Removing Background, may take a few seconds...")
         self.image = remove(self.image, session=my_session)
         self.update_np_image()
+        self.print_and_debug("Background Removed")
 
     def save_image(self, optimal, image_quality, keep_original=True, keep_exif=False, choose_smaller=True):
         self.image = Image.fromarray(self.np_image)
 
         # Save image.
         if keep_exif:
-            self.image.save(self.destiny, optimize=optimal, quality=image_quality, exif=self.image.getexif())
+            self.image.save(self.destiny, optimize=optimal, quality=image_quality, exif=self.exif)
         else:
             self.image.save(self.destiny, optimize=optimal, quality=image_quality)
         self.image.close()
@@ -227,8 +232,10 @@ class ImageProcessor:
         os.remove(self.image_path)
 
     def process_image(self, width, height, border_ratio, black_dots=False):
+        if self.image.mode == 'P' and self.image.has_transparency_data:
+            self.formatting('png', 'RGBA')
         self.remove_background()
-        self.enhance("jpg", "RGB")
+        self.formatting("jpg", "RGB")
         self.centralize_image(width, height)
         self.pad_image(border_ratio)
 

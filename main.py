@@ -38,7 +38,7 @@ def process_image(file):
     try:
         foto = Img.ImageProcessor(origin, destiny)
         foto.process_image(900, 900, 50, True)
-        foto.enhance(extention, mode)
+        foto.formatting(extention, mode)
         foto.save_image(optimal, image_quality, keep_original, keep_exif, choose_smaller=False)
     except IOError or Exception:
         print(origin + "\tError")
