@@ -9,9 +9,9 @@ from rembg import remove, new_session
 # cr2, erf, heic, nrw, orf, pef, pes, ref, rw2
 
 
-# Set proper extention to the end result.
-def correct(string, extention):
-    return string.rpartition('.')[0] + '.' + extention
+# Set proper extension to the end result.
+def correct(string, extension):
+    return string.rpartition('.')[0] + '.' + extension
 
 
 # Check image mode to see if conversion is needed.
@@ -19,7 +19,7 @@ def check_mode(mode, formating):
     formating = formating.upper()
     if mode == '1':
         mode = 'One'
-    # Lists of extentions allowed by each mode.
+    # Lists of extensions allowed by each mode.
     RGB = ['JFIF', 'JP2', 'WEBP', 'SGI', 'ICO', 'JPE', 'PCX', 'PGM', 'PNG', 'PNM', 'PPM', 'TGA', 'TIFF', 'GIF',
            'JPEG', 'JPG', 'PBM']
     RGBA = ['JP2', 'WEBP', 'SGI', 'ICO', 'PGM', 'PNG', 'PNM', 'PPM', 'TGA', 'TIFF', 'GIF', 'PBM']
@@ -216,7 +216,7 @@ class ImageProcessor:
             self.image.save(self.destiny, optimize=optimal, quality=image_quality)
         self.image.close()
 
-        # Get original file's extention for reporting and checking if enhancing was worth it.
+        # Get original file's extension for reporting and checking if enhancing was worth it.
         if self.image_path.split('.')[-1] != self.destiny.split('.')[-1]:
             print(self.image_path, "\tConverted from " +
                   self.image_path.split('.')[-1] + " to " + self.destiny.split('.')[-1] + " and enhanced!")

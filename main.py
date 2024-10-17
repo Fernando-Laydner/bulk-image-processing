@@ -4,7 +4,7 @@ import threading
 from queue import Queue
 
 # Idea: A more user-end .exe file with tkinter (Logs, Options), cmd launch option for batch and automated uses.
-# Loss mode: enables for continious compression until file size is at or below desired or mininal image_quality
+# Loss mode: enables for continuous compression until file size is at or below desired or minimal image_quality
 # is reached.
 
 # Get file location.
@@ -13,7 +13,7 @@ address = os.path.abspath(os.getcwd())
 # Global variables for easier customizability.
 optimal = True
 image_quality = 85
-extention = 'jpg'
+extension = 'jpg'
 keep_original = True
 keep_exif = False
 crop_and_resizing = True
@@ -35,7 +35,7 @@ def process_image(file):
 
     # Adjust path to file.
     origin = os.path.join(origin_base, file).lower()
-    destiny = Img.correct(os.path.join(destiny_base, file), extention).lower()
+    destiny = Img.correct(os.path.join(destiny_base, file), extension).lower()
 
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
@@ -47,7 +47,7 @@ def process_image(file):
         foto.formatting("jpg", "RGB")
         foto.centralize_image(size, size, True, False)
         foto.pad_image(pad)
-        foto.formatting(extention, mode)
+        foto.formatting(extension, mode)
         # Black dot
         if True:
             foto.np_image[0, 0] = [0, 0, 0]
