@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 from shutil import copyfile
-from PIL import Image, ImageFilter
+from PIL import Image
 from rembg import remove, new_session
 
 # Known extensions not supported: exr, pfm, sfw, x3f, fts, hdr, mng, pam, picon, pict, wpg, xcf, xpm, xwd, svg, wbmp,
@@ -65,6 +65,7 @@ def check_mode(mode, formating):
 
 
 class ImageProcessor:
+    model = 0
     image = None
     np_image = None
     gray = None
@@ -144,7 +145,7 @@ class ImageProcessor:
         self.height, self.width = self.np_image.shape[:2]
         self.print_and_debug("Padding added")
 
-    def centralize_image(self, width, height):
+    def centralize_image(self, width, height, resize=True, rotate=True):
         if self.gray is None:
             self.gray = cv2.cvtColor(self.np_image, cv2.COLOR_BGR2GRAY)
         rows = np.any(self.gray < 255, axis=1)
@@ -158,15 +159,17 @@ class ImageProcessor:
         self.true_height, self.true_width = self.np_image.shape[:2]
 
         # Rotate if necessary
-        if self.true_height < self.true_width / 2:
-            self.rotate_image(45)
-            self.print_and_debug("Rotated")
+        if rotate:
+            if self.true_height < self.true_width / 2:
+                self.rotate_image(45)
+                self.print_and_debug("Rotated")
 
         # Resize if necessary
-        h, w, _ = self.np_image.shape
-        if w != width or h != height:
-            self.image_resize_exact(width, height)
-            self.print_and_debug("Resized")
+        if resize:
+            h, w, _ = self.np_image.shape
+            if w != width or h != height:
+                self.image_resize_exact(width, height)
+                self.print_and_debug("Resized")
 
         # Create a centered image
         h, w, _ = self.np_image.shape
@@ -197,7 +200,7 @@ class ImageProcessor:
 
     def remove_background(self):
         modelos = ["birefnet-general-lite", "silueta"]  # A lot faster the second option, but not as good...
-        my_session = new_session(modelos[0])
+        my_session = new_session(modelos[self.model])
         print("Removing Background, may take a few seconds...")
         self.image = remove(self.image, session=my_session)
         self.update_np_image()

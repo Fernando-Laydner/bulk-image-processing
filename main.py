@@ -22,6 +22,9 @@ destiny_base = os.path.join(address, 'Ready Images')
 os.makedirs(destiny_base, exist_ok=True)
 origin_base = address + '\\'
 thread_number = 1
+# Actual size, it discounts the padding later.
+size = 1000
+pad = 50
 
 
 # Function to process images
@@ -37,8 +40,19 @@ def process_image(file):
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
         foto = Img.ImageProcessor(origin, destiny)
-        foto.process_image(900, 900, 50, True)
+        foto.model = 0
+        if foto.image.mode == 'P' and foto.image.has_transparency_data:
+            foto.formatting('png', 'RGBA')
+        foto.remove_background()
+        foto.formatting("jpg", "RGB")
+        foto.centralize_image(size, size, True, False)
+        foto.pad_image(pad)
         foto.formatting(extention, mode)
+        # Black dot
+        if True:
+            foto.np_image[0, 0] = [0, 0, 0]
+            foto.np_image[foto.height - 1, foto.width - 1] = [0, 0, 0]
+
         foto.save_image(optimal, image_quality, keep_original, keep_exif, choose_smaller=False)
     except IOError or Exception:
         print(origin + "\tError")
@@ -54,23 +68,26 @@ def worker():
         q.task_done()
 
 
-# Create a queue and add files to it
-q = Queue()
-for file_in_address in os.listdir(address):
-    q.put(file_in_address)
+if __name__ == '__main__':
+    size = size - 2*pad
 
-# Create and start threads
-threads = []
-for i in range(thread_number):
-    t = threading.Thread(target=worker)
-    t.start()
-    threads.append(t)
+    # Create a queue and add files to it
+    q = Queue()
+    for file_in_address in os.listdir(address):
+        q.put(file_in_address)
 
-# Block until all tasks are done
-q.join()
+    # Create and start threads
+    threads = []
+    for i in range(thread_number):
+        t = threading.Thread(target=worker)
+        t.start()
+        threads.append(t)
 
-# Stop workers
-for i in range(thread_number):
-    q.put(None)
-for t in threads:
-    t.join()
+    # Block until all tasks are done
+    q.join()
+
+    # Stop workers
+    for i in range(thread_number):
+        q.put(None)
+    for t in threads:
+        t.join()
