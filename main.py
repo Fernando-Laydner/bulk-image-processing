@@ -40,7 +40,7 @@ def process_image(file):
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
         foto = Img.ImageProcessor(origin, destiny)
-        foto.model = 1
+        foto.model = 0
         if foto.image.mode == 'P' and foto.image.has_transparency_data:
             foto.formatting('png', 'RGBA')
         foto.remove_background()
