@@ -198,13 +198,21 @@ class ImageProcessor:
         self.height, self.width = self.np_image.shape[:2]
         self.true_height, self.true_width = self.np_image.shape[:2]
 
-    def remove_background(self):
+    def remove_background(self, model=0):
+        self.model = model
+        if self.image.mode == 'P' and self.image.has_transparency_data:
+            self.formatting('png', 'RGBA')
         modelos = ["birefnet-general-lite", "silueta"]  # A lot faster the second option, but not as good...
         my_session = new_session(modelos[self.model])
         print("Removing Background, may take a few seconds...")
         self.image = remove(self.image, session=my_session)
         self.update_np_image()
         self.print_and_debug("Background Removed")
+        self.formatting("jpg", "RGB")
+
+    def black_dots(self):
+        self.np_image[0, 0] = [0, 0, 0]
+        self.np_image[self.height - 1, self.width - 1] = [0, 0, 0]
 
     def save_image(self, optimal, image_quality, keep_original=True, keep_exif=False, choose_smaller=True):
         self.image = Image.fromarray(self.np_image)

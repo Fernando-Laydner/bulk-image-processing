@@ -22,15 +22,17 @@ destiny_base = os.path.join(address, 'Ready Images')
 os.makedirs(destiny_base, exist_ok=True)
 origin_base = address + '\\'
 thread_number = 1
-# Actual size, it discounts the padding later.
+# Actual size
 size = 1000
 pad = 50
+size = size - 2 * pad
 
 
 # Function to process images
 def process_image(file):
     # Only doing like this because those are the only files in my current folder that should not be images
-    if file.find('.py') != -1 or file.find('.') == -1 or file.find('.idea') != -1:
+    if (file.find('.py') != -1 or file.find('.') == -1 or file.find('.idea') != -1 or file.find('.git') != -1 or
+            file.find('.md') != -1):
         return
 
     # Adjust path to file.
@@ -40,18 +42,11 @@ def process_image(file):
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
         foto = Img.ImageProcessor(origin, destiny)
-        foto.model = 0
-        if foto.image.mode == 'P' and foto.image.has_transparency_data:
-            foto.formatting('png', 'RGBA')
         foto.remove_background()
-        foto.formatting("jpg", "RGB")
         foto.centralize_image(size, size, True, False)
         foto.pad_image(pad)
         foto.formatting(extension, mode)
-        # Black dot
-        if True:
-            foto.np_image[0, 0] = [0, 0, 0]
-            foto.np_image[foto.height - 1, foto.width - 1] = [0, 0, 0]
+        foto.black_dots()
 
         foto.save_image(optimal, image_quality, keep_original, keep_exif, choose_smaller=False)
     except IOError or Exception:
@@ -69,8 +64,6 @@ def worker():
 
 
 if __name__ == '__main__':
-    size = size - 2*pad
-
     # Create a queue and add files to it
     q = Queue()
     for file_in_address in os.listdir(address):
