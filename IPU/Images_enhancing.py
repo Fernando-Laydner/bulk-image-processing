@@ -90,11 +90,15 @@ class ImageProcessor:
     # Open image to CV because it doesn't like to work
     def open_image(self):
         self.image = Image.open(self.image_path)
+        if self.image.mode != 'RGBA' and 'A' in self.image.getbands():  # Check for alpha channel
+            self.image = self.image.convert("RGBA")
         self.update_np_image()
 
     def update_np_image(self):
         self.image.load()
         self.np_image = np.array(self.image, np.uint8).copy()
+        if self.image.mode == 'RGBA':
+            self.np_image = cv2.cvtColor(self.np_image, cv2.COLOR_BGRA2RGBA)
 
     def print_and_debug(self, where):
         if self.debug:
@@ -117,7 +121,20 @@ class ImageProcessor:
 
         # Probably more changes will be necessary here.
         if self.image.mode != best_mode:
-            if self.image.mode == 'P':
+            if self.image.mode == 'CMYK':
+                # Convert CMYK to RGB by manually transforming pixel data
+                cmyk_data = self.image.getdata()
+                rgb_data = []
+                for c, m, y, k in cmyk_data:
+                    rgb_data += [(int(255 * (1.0 - c / 255) * (1.0 - k / 255)), int(255 * (1.0 - y / 255) * (1.0 - k / 255)),
+                                int(255 * (1.0 - m / 255) * (1.0 - k / 255)))]
+
+                # Create a new RGBA image from the manually converted RGB data
+                new_image = Image.new("RGB", self.image.size)
+                new_image.putdata(rgb_data)
+                self.image = new_image
+                self.update_np_image()
+            elif self.image.mode == 'P':
                 self.image = self.image.convert("RGBA")
 
             if best_mode != 'RGBA' and self.image.mode == 'RGBA':
@@ -171,17 +188,25 @@ class ImageProcessor:
                 self.image_resize_exact(width, height)
                 self.print_and_debug("Resized")
 
-        # Create a centered image
-        h, w, _ = self.np_image.shape
-        centered_image = np.zeros((height, width, 3), np.uint8)
-        centered_image.fill(255)
+            # Determine if the image has an alpha channel
+            channels = self.np_image.shape[2] if len(self.np_image.shape) > 2 else 1
+            if channels == 4:
+                # If RGBA, create an RGBA canvas with a transparent background
+                centered_image = np.zeros((height, width, 4), np.uint8)
+                centered_image[..., :3] = 255  # White background for RGB channels
+                centered_image[..., 3] = 0  # Transparent alpha channel
+            else:
+                # If RGB, create an RGB canvas with a white background
+                centered_image = np.full((height, width, 3), 255, np.uint8)
 
-        top_left_y = (height - h) // 2
-        top_left_x = (width - w) // 2
-        centered_image[top_left_y:top_left_y + h, top_left_x:top_left_x + w] = self.np_image
-        self.np_image = centered_image
-        self.height, self.width = self.np_image.shape[:2]
-        self.print_and_debug("Centered")
+            # Center the image on the canvas
+            h, w, _ = self.np_image.shape
+            top_left_y = (height - h) // 2
+            top_left_x = (width - w) // 2
+            centered_image[top_left_y:top_left_y + h, top_left_x:top_left_x + w] = self.np_image
+            self.np_image = centered_image
+            self.height, self.width = self.np_image.shape[:2]
+            self.print_and_debug("Centered")
 
     def rotate_image(self, angle):
         height, width = self.np_image.shape[:2]
@@ -199,25 +224,29 @@ class ImageProcessor:
         self.true_height, self.true_width = self.np_image.shape[:2]
 
     def remove_background(self, model=0):
-        self.model = model
-        if self.image.mode == 'P' and self.image.has_transparency_data:
+        if self.image.mode == 'P':
             self.formatting('png', 'RGBA')
-        modelos = ["birefnet-general-lite", "silueta"]  # A lot faster the second option, but not as good...
-        my_session = new_session(modelos[self.model])
-        print("Removing Background, may take a few seconds...")
-        self.image = remove(self.image, session=my_session)
-        self.update_np_image()
-        self.print_and_debug("Background Removed")
+        if not self.image.has_transparency_data and model != -1:
+            self.model = model
+            print("Removing Background, may take a few seconds...")
+            modelos = ["birefnet-general-lite", "silueta", "birefnet-hrsod"]
+            my_session = new_session(modelos[self.model])
+            self.image = remove(self.image, session=my_session)
+            self.update_np_image()
+            self.print_and_debug("Background Removed")
         self.formatting("jpg", "RGB")
 
     def black_dots(self):
-        self.np_image[0, 0] = [0, 0, 0]
-        self.np_image[self.height - 1, self.width - 1] = [0, 0, 0]
+        channels = self.np_image.shape[2] if len(self.np_image.shape) > 2 else 1
+        if channels == 4:
+            self.np_image[0, 0] = [0, 0, 0, 0]
+            self.np_image[self.height - 1, self.width - 1] = [0, 0, 0, 0]
+        else:
+            self.np_image[0, 0] = [0, 0, 0]
+            self.np_image[self.height - 1, self.width - 1] = [0, 0, 0]
 
     def save_image(self, optimal, image_quality, keep_original=True, keep_exif=False, choose_smaller=True):
         self.image = Image.fromarray(self.np_image)
-
-        # Save image.
         if keep_exif:
             self.image.save(self.destiny, optimize=optimal, quality=image_quality, exif=self.exif)
         else:
@@ -242,14 +271,9 @@ class ImageProcessor:
     def delete_original(self):
         os.remove(self.image_path)
 
-    def process_image(self, width, height, border_ratio, black_dots=False):
-        if self.image.mode == 'P' and self.image.has_transparency_data:
-            self.formatting('png', 'RGBA')
-        self.remove_background()
-        self.formatting("jpg", "RGB")
-        self.centralize_image(width, height)
-        self.pad_image(border_ratio)
-
-        if black_dots:
-            self.np_image[0, 0] = [0, 0, 0]
-            self.np_image[self.height - 1, self.width - 1] = [0, 0, 0]
+    def process_image(self, formatting, mode, width, height, padding, model=1):
+        self.remove_background(model=model)
+        self.centralize_image(width, height, True, True)
+        self.pad_image(padding)
+        self.formatting(formatting, mode)
+        self.black_dots()
