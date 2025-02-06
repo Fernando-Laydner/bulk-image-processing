@@ -14,9 +14,10 @@ address = os.path.abspath(os.getcwd())
 optimal = True
 image_quality = 85
 extension = 'jpg'
-keep_original = False
+keep_original = True
 keep_exif = False
-crop_and_resizing = True
+_resize=True
+_rotate=True
 mode = 'RGB'
 destiny_base = os.path.join(address, 'Ready Images')
 os.makedirs(destiny_base, exist_ok=True)
@@ -42,7 +43,7 @@ def process_image(file):
     # Try opening files, in case they are not images the return an Error, or if there are any problems saving images.
     try:
         foto = Img.ImageProcessor(origin, destiny)
-        foto.process_image(extension, mode, size, size, pad, model=-1)
+        foto.process_image(extension, mode, size, size, pad, model=-1, resize=_resize, rotate=_rotate)
         foto.save_image(optimal, image_quality, keep_original, keep_exif, choose_smaller=False)
     except IOError or Exception:
         print(origin + "\tError")

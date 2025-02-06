@@ -271,9 +271,9 @@ class ImageProcessor:
     def delete_original(self):
         os.remove(self.image_path)
 
-    def process_image(self, formatting, mode, width, height, padding, model=1):
+    def process_image(self, formatting, mode, width, height, padding, model=1, resize=True, rotate=True):
         self.remove_background(model=model)
-        self.centralize_image(width, height, True, True)
+        self.centralize_image(width, height, resize, rotate)
         self.pad_image(padding)
         self.formatting(formatting, mode)
         self.black_dots()
